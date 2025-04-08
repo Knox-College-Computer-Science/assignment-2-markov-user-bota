@@ -1,7 +1,11 @@
+# Akbota
 import random
 import glob
 import sys
 import traceback
+import os
+import re
+
 
 """
 Markov Babbler
@@ -111,7 +115,34 @@ class Babbler:
         and that any n-grams that stops a sentence should be followed by the
         special symbol 'EOL' in the state transition table. 'EOL' is short for 'end of line'; since it is capitalized and all our input texts are lower-case, it will be unambiguous.
         """
+        words = sentence.lower().split() # splitting and lowercasing
 
+        if len(words)< self.n: # skipping ones that are too short
+            return
+        
+        start = " ".join(words[:self.n]) 
+        self.starters.append(start) # starting processing n-grams 
+        
+        for i in range (len(words) - self.n):
+            ngram = " ".join(words[i:i + self.n]) # creating ngram
+            next = words[i+self.n] # next word
+
+            if ngram not in self.brainGraph: # adding word to the graph if not there
+                self.brainGraph[ngram] = []
+            self.brainGraph[ngram].append(next)
+        
+        
+            #self.stoppers.append(stop)
+
+        stop = " ".join(words[-self.n:]) # slast ngram
+
+        if stop not in self.brainGraph:
+            self.brainGraph[stop] = []
+        self.brainGraph[stop].append("EOL")
+
+        self.stoppers.append(stop)
+        
+        #should i delete this?   
         pass #The pass statement is used as a placeholder for future code. When the pass statement is executed, nothing happens, but you avoid getting an error when empty code is not allowed. Empty code is not allowed in loops, function definitions, class definitions, or in if statements.
 
 
@@ -121,6 +152,7 @@ class Babbler:
         The resulting list may contain duplicates, because one n-gram may start
         multiple sentences. Probably a one-line method.
         """
+        return self.starters
         pass
     
 
@@ -130,6 +162,7 @@ class Babbler:
         The resulting value may contain duplicates, because one n-gram may stop
         multiple sentences. Probably a one-line method.
         """
+        return self.stoppers
         pass
 
 
@@ -145,7 +178,7 @@ class Babbler:
         If n=3, then the n-gram 'the dog dances' is followed by 'quickly' one time, and 'with' two times.
         If the given state never occurs, return an empty list.
         """
-
+        return self.brainGraph.get(ngram, [])
         pass
     
 
@@ -154,7 +187,7 @@ class Babbler:
         Return all the possible n-grams (sequences of n words), that we have seen across all sentences.
         Probably a one-line method.
         """
-
+        return list(self.brainGraph.keys())
         pass
 
     
@@ -165,7 +198,7 @@ class Babbler:
         because ngrams with no successor words must not have occurred in the training sentences.
         Probably a one-line method.
         """
-
+        return ngram in self.brainGraph and len(self.brainGraph[ngram])>0
         pass
     
     
@@ -180,7 +213,8 @@ class Babbler:
         and we call get_random_next_word() for the state 'the dog dances',
         we should get 'quickly' about 1/3 of the time, and 'with' 2/3 of the time.
         """
-
+        success = self.get_successors(ngram)
+        return random.choice(success)
         pass
     
 
@@ -198,6 +232,28 @@ class Babbler:
             Our example state is now: 'b c d' 
         6: Repeat from step 2.
         """
+        ngram = random.choice(self.starters)
+        sen = ngram # for the beginning
+        stop = "EOL"
+
+        #
+        while True: 
+            success = self.brainGraph.get(ngram, []) # getting successor for ngram
+
+            if not success in success: #time to stop if not successor
+                break
+
+            next = random.choice(success) # picking random  successor word
+            if next is stop: #break if next word is stop word which is EOL
+                break
+
+            sen += " " + next # adding word to the sentence
+
+            curr = ngram.split() 
+            curr.append(next) # adding new word
+            ngram = " ".join(curr[-self.n:]) # keeping only llast words
+
+        return sen
 
         pass
             
@@ -248,3 +304,33 @@ if __name__ == '__main__':
     if len(sys.argv) > 0: # if any more were passed, the next is assumed to be number of sentences to be generated 
         num_sentences = int(sys.argv.pop(0))
     main(n, filename, num_sentences) # now we call main with all the actual or default arguments
+
+
+    # training markov with books folder
+    def training_books_folder(markov, folder_path="books"): #location of the books
+        for filename in os.listdir(folder_path):
+            if filename.endswith(".txt"): # just in case of other files
+                file_path = os.path.join(folder_path, filename) #combining the path
+                
+                with open(file_path, "r", encoding="utf-8") as f: #reading content + making sure evrything read  correctly and neatly
+                    
+                    text = f.read() #our text
+                    text = re.sub(r"\s+", " ", text) #remoning newlines and spaces
+
+                    sen = re.split(r'[.!?]', text) #splitting it with .!?
+
+                    for s in sen:
+                        s = s.strip()
+                        if s:
+                            markov.add_sentence(s)
+
+    markov = Babbler(n=10) #for more meaningful context
+
+    # training markov with books folder
+    training_books_folder(markov)
+
+    # creating markov sentences
+    for _ in range(10):
+        print(markov.babble().capitalize())
+
+    
